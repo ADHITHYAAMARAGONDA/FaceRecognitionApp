@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Face Recognition</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid black; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        button { padding: 5px 10px; color: white; background: red; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>Admin Dashboard - Known Faces</h2>
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Actions</th>
+        </tr>
+        {% for face in faces %}
+        <tr>
+            <td>{{ face[0] }}</td>
+            <td>{{ face[1] }}</td>
+            <td>
+                <form action="/delete_face" method="POST">
+                    <input type="hidden" name="face_id" value="{{ face[0] }}">
+                    <button type="submit">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

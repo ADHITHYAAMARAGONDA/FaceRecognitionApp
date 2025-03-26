@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Face Recognition Web App</title>
+</head>
+<body>
+    <h1>Face Recognition Live Stream</h1>
+    
+    <!-- Live Video Feed -->
+    <img src="{{ url_for('video_feed') }}" width="640" height="480">
+
+    <!-- Form to Add a New Face -->
+    <h2>Add a New Face</h2>
+    <form action="/add_face" method="post">
+        <input type="text" name="name" placeholder="Enter Name" required>
+        <button type="submit">Add Face</button>
+    </form>
+
+    <!-- Link to Admin Page to Manage Faces -->
+    <br>
+    <a href="/admin">Manage Faces (Admin Panel)</a>
+</body>
+</html>
