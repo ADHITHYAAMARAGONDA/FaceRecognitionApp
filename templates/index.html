@@ -5,43 +5,67 @@
 </head>
 <body>
     <h1>Face Recognition Live Stream</h1>
-    <video id="webcam" autoplay></video>
+
+    <!-- Webcam Video Stream -->
+    <video id="video" autoplay></video>
     <canvas id="canvas" style="display:none;"></canvas>
-    <button onclick="captureFrame()">Capture & Recognize</button>
+
+    <!-- Recognized Image Output -->
+    <h3>Recognized Face:</h3>
+    <img id="outputImage" alt="Processed Image">
+
+    <!-- Manual Buttons (Optional) -->
     <button onclick="addFace()">Add Face</button>
+
+    <!-- Database Management Link -->
+    <br><br>
+    <a href="/admin">🔗 Manage Database (View, Delete, Update)</a>
+
     <p id="response"></p>
 
     <script>
-        let video = document.getElementById('webcam');
-        let canvas = document.getElementById('canvas');
-        let ctx = canvas.getContext('2d');
+        const video = document.getElementById("video");
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
 
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => video.srcObject = stream)
-            .catch(error => console.error("Error accessing webcam:", error));
-
-        function captureFrame() {
+        function sendFrame() {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            canvas.toBlob(sendFrame, 'image/jpeg');
-        }
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        function sendFrame(blob) {
-            let formData = new FormData();
-            formData.append("frame", blob);
+            canvas.toBlob(blob => {
+                const formData = new FormData();
+                formData.append("frame", blob);
 
-            fetch('/process_frame', { method: 'POST', body: formData })
+                fetch("/process_frame", {
+                    method: "POST",
+                    body: formData
+                })
                 .then(response => response.blob())
                 .then(blob => {
-                    let imgUrl = URL.createObjectURL(blob);
-                    document.body.innerHTML += `<img src="${imgUrl}">`;
-                });
+                    const url = URL.createObjectURL(blob);
+                    document.getElementById("outputImage").src = url;
+                })
+                .catch(error => console.error("Error:", error));
+            }, "image/jpeg");
+
+            setTimeout(sendFrame, 1000);  // Send a new frame every second
         }
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+                sendFrame();  // Start sending frames automatically
+            })
+            .catch(error => console.error("Error accessing webcam:", error));
 
         function addFace() {
             let name = prompt("Enter name:");
             if (!name) return;
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             canvas.toBlob(blob => {
                 let formData = new FormData();

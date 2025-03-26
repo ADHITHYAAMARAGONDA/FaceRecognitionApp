@@ -31,7 +31,7 @@ def get_face_embedding(face_image):
     blob = cv2.dnn.blobFromImage(face_image, scalefactor=1.0/255, size=(112, 112), mean=(0, 0, 0), swapRB=True, crop=False)
     recognition_net.setInput(blob)
     embedding = recognition_net.forward()
-    embedding = embedding.flatten() / np.linalg.norm(embedding)
+    embedding = embedding.flatten() / np.linalg.norm(embedding)  # Normalize embedding
     return embedding
 
 # ✅ Load Known Faces from MySQL
@@ -46,7 +46,7 @@ def load_known_faces():
 known_faces_db = load_known_faces()
 print(f"✅ Loaded {len(known_faces_db)} known faces: {list(known_faces_db.keys())}")
 
-# ✅ Route to Process Webcam Frames
+# ✅ Route to Process Webcam Frames (Automatic Face Recognition)
 @app.route('/process_frame', methods=['POST'])
 def process_frame():
     if 'frame' not in request.files:
@@ -56,17 +56,17 @@ def process_frame():
     npimg = np.frombuffer(file.read(), np.uint8)
     frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
 
-    # 🟢 Perform Face Detection
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
-    detected_name = "Unknown"
+    recognized_name = "Unknown"
+
     for (x, y, w, h) in faces:
         face = frame[y:y+h, x:x+w]
         if face.shape[0] > 0 and face.shape[1] > 0:
             face_embedding = get_face_embedding(face)
 
-            # Compare with Known Faces
+            # Compare with known faces
             highest_similarity = 0.0
             for name, known_embedding in known_faces_db.items():
                 cosine_similarity = np.dot(face_embedding, known_embedding) / (
@@ -74,11 +74,11 @@ def process_frame():
                 )
                 if cosine_similarity > highest_similarity and cosine_similarity > 0.55:
                     highest_similarity = cosine_similarity
-                    detected_name = name
+                    recognized_name = name  # Set recognized name
 
-            # Draw Bounding Box & Name
+            # Draw bounding box and name
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.putText(frame, detected_name, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            cv2.putText(frame, recognized_name, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
     _, buffer = cv2.imencode('.jpg', frame)
     return Response(buffer.tobytes(), mimetype='image/jpeg')
@@ -113,12 +113,20 @@ def add_face():
 
     return jsonify({"error": "❌ Face not detected."})
 
-# ✅ Route for Admin Panel
+# ✅ Route for Admin Panel (View & Delete Faces)
 @app.route('/admin')
 def admin():
     cursor.execute("SELECT id, name FROM known_faces")
     faces = cursor.fetchall()
     return render_template('admin.html', faces=faces)
+
+# ✅ Route to Delete a Face
+@app.route('/delete_face', methods=['POST'])
+def delete_face():
+    face_id = request.form['face_id']
+    cursor.execute("DELETE FROM known_faces WHERE id = %s", (face_id,))
+    db.commit()
+    return redirect(url_for('admin'))
 
 # ✅ Flask Route for Home Page
 @app.route('/')
