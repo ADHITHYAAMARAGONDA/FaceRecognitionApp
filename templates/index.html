@@ -5,23 +5,14 @@
 </head>
 <body>
     <h1>Face Recognition Live Stream</h1>
-
-    <!-- Webcam Video Stream -->
     <video id="video" autoplay></video>
-    <canvas id="canvas" style="display:none;"></canvas>
-
-    <!-- Recognized Image Output -->
-    <h3>Recognized Face:</h3>
-    <img id="outputImage" alt="Processed Image">
-
-    <!-- Manual Buttons (Optional) -->
+    <img id="outputImage" style="display:block; width: 300px;">
+    
     <button onclick="addFace()">Add Face</button>
-
-    <!-- Database Management Link -->
-    <br><br>
-    <a href="/admin">🔗 Manage Database (View, Delete, Update)</a>
-
     <p id="response"></p>
+
+    <!-- 🔗 Database Management Link -->
+    <a href="/admin">🔗 Manage Database (View, Delete, Update)</a>
 
     <script>
         const video = document.getElementById("video");
@@ -49,23 +40,19 @@
                 .catch(error => console.error("Error:", error));
             }, "image/jpeg");
 
-            setTimeout(sendFrame, 1000);  // Send a new frame every second
+            setTimeout(sendFrame, 1000);
         }
 
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => {
                 video.srcObject = stream;
-                sendFrame();  // Start sending frames automatically
+                sendFrame();
             })
             .catch(error => console.error("Error accessing webcam:", error));
 
         function addFace() {
             let name = prompt("Enter name:");
             if (!name) return;
-
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             canvas.toBlob(blob => {
                 let formData = new FormData();
