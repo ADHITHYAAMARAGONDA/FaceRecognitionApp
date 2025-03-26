@@ -5,13 +5,15 @@
 </head>
 <body>
     <h1>Face Recognition Live Stream</h1>
+    
+    <!-- ✅ Show only one video stream -->
     <video id="video" autoplay></video>
     <img id="outputImage" style="display:block; width: 300px;">
     
     <button onclick="addFace()">Add Face</button>
     <p id="response"></p>
 
-    <!-- 🔗 Database Management Link -->
+    <!-- ✅ Database Management Link -->
     <a href="/admin">🔗 Manage Database (View, Delete, Update)</a>
 
     <script>
@@ -32,21 +34,23 @@
                     method: "POST",
                     body: formData
                 })
-                .then(response => response.blob())
-                .then(blob => {
-                    const url = URL.createObjectURL(blob);
-                    document.getElementById("outputImage").src = url;
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("outputImage").src = data.image_url;
+                    if (data.name) {
+                        document.getElementById("response").innerText = `Recognized: ${data.name}`;
+                    }
                 })
                 .catch(error => console.error("Error:", error));
             }, "image/jpeg");
 
-            setTimeout(sendFrame, 1000);
+            setTimeout(sendFrame, 1000);  // Send a frame every second
         }
 
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => {
                 video.srcObject = stream;
-                sendFrame();
+                sendFrame();  // ✅ Automatically start recognition
             })
             .catch(error => console.error("Error accessing webcam:", error));
 

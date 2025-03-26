@@ -2,10 +2,11 @@ from flask import Flask, render_template, request, Response, redirect, url_for, 
 import cv2
 import numpy as np
 import mysql.connector
+import base64
 
 app = Flask(__name__)
 
-# ✅ Function to Connect to Railway MySQL Database
+# ✅ Connect to Railway MySQL Database
 def connect_db():
     return mysql.connector.connect(
         host="shinkansen.proxy.rlwy.net",
@@ -31,8 +32,7 @@ def get_face_embedding(face_image):
     blob = cv2.dnn.blobFromImage(face_image, scalefactor=1.0/255, size=(112, 112), mean=(0, 0, 0), swapRB=True, crop=False)
     recognition_net.setInput(blob)
     embedding = recognition_net.forward()
-    embedding = embedding.flatten() / np.linalg.norm(embedding)  # Normalize embedding
-    return embedding
+    return embedding.flatten() / np.linalg.norm(embedding)  # Normalize
 
 # ✅ Load Known Faces from MySQL
 def load_known_faces():
@@ -50,7 +50,7 @@ print(f"✅ Loaded {len(known_faces_db)} known faces: {list(known_faces_db.keys(
 @app.route('/process_frame', methods=['POST'])
 def process_frame():
     if 'frame' not in request.files:
-        return "No frame received", 400
+        return jsonify({"error": "No frame received"}), 400
 
     file = request.files['frame']
     npimg = np.frombuffer(file.read(), np.uint8)
@@ -81,7 +81,8 @@ def process_frame():
             cv2.putText(frame, recognized_name, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
     _, buffer = cv2.imencode('.jpg', frame)
-    return Response(buffer.tobytes(), mimetype='image/jpeg')
+    image_base64 = base64.b64encode(buffer).decode('utf-8')
+    return jsonify({"name": recognized_name, "image_url": f"data:image/jpeg;base64,{image_base64}"})
 
 # ✅ Route to Add New Face
 @app.route('/add_face', methods=['POST'])
@@ -119,14 +120,6 @@ def admin():
     cursor.execute("SELECT id, name FROM known_faces")
     faces = cursor.fetchall()
     return render_template('admin.html', faces=faces)
-
-# ✅ Route to Delete a Face
-@app.route('/delete_face', methods=['POST'])
-def delete_face():
-    face_id = request.form['face_id']
-    cursor.execute("DELETE FROM known_faces WHERE id = %s", (face_id,))
-    db.commit()
-    return redirect(url_for('admin'))
 
 # ✅ Flask Route for Home Page
 @app.route('/')
