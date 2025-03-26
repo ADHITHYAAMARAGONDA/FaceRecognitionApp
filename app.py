@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, Response, redirect, url_for
+ from flask import Flask, render_template, request, Response, redirect, url_for
 import cv2
 import numpy as np
 import mysql.connector
@@ -49,6 +49,23 @@ def load_known_faces():
 # ✅ Global Variable to Store Known Faces
 known_faces_db = load_known_faces()
 print(f"✅ Loaded {len(known_faces_db)} known faces: {list(known_faces_db.keys())}")
+
+# ✅ Global Camera Variable
+video_cap = None
+
+# ✅ Function to Get Camera Instance
+def get_camera():
+    global video_cap
+    if video_cap is None or not video_cap.isOpened():
+        video_cap = cv2.VideoCapture(0)
+    return video_cap
+
+# ✅ Function to Release Camera
+def release_camera():
+    global video_cap
+    if video_cap is not None:
+        video_cap.release()
+        video_cap = None
 
 # ✅ Flask Route for Home Page
 @app.route('/')
@@ -142,4 +159,7 @@ def add_face():
 
 # ✅ Run Flask App
 if __name__ == "__main__":
-    app.run(debug=True)
+    try:
+        app.run(debug=True)
+    finally:
+        release_camera()  # Ensure the camera is released when the app stops
