@@ -1,4 +1,4 @@
- from flask import Flask, render_template, request, Response, redirect, url_for
+from flask import Flask, render_template, request, Response, redirect, url_for
 import cv2
 import numpy as np
 import mysql.connector
