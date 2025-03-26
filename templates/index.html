@@ -1,55 +1,58 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Face Recognition Web App</title>
+    <title>Face Recognition</title>
 </head>
 <body>
     <h1>Face Recognition Live Stream</h1>
-
-    <!-- Video Element to Show Live Webcam -->
-    <video id="webcam" autoplay playsinline width="640" height="480"></video>
-    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
-    <img id="processedFrame" width="640" height="480">
+    <video id="webcam" autoplay></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <button onclick="captureFrame()">Capture & Recognize</button>
+    <button onclick="addFace()">Add Face</button>
+    <p id="response"></p>
 
     <script>
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const processedFrame = document.getElementById('processedFrame');
+        let video = document.getElementById('webcam');
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
 
-        async function setupCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                video.srcObject = stream;
-                processFrame();
-            } catch (err) {
-                console.error("Error accessing webcam: ", err);
-            }
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => video.srcObject = stream)
+            .catch(error => console.error("Error accessing webcam:", error));
+
+        function captureFrame() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            canvas.toBlob(sendFrame, 'image/jpeg');
         }
 
-        function processFrame() {
-            setInterval(() => {
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                canvas.toBlob(blob => {
-                    const formData = new FormData();
-                    formData.append('frame', blob, 'frame.jpg');
+        function sendFrame(blob) {
+            let formData = new FormData();
+            formData.append("frame", blob);
 
-                    fetch('/process_frame', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(response => response.blob())
-                    .then(blob => {
-                        processedFrame.src = URL.createObjectURL(blob);
-                    })
-                    .catch(error => console.error("Error sending frame:", error));
-                }, 'image/jpeg');
-            }, 100);
+            fetch('/process_frame', { method: 'POST', body: formData })
+                .then(response => response.blob())
+                .then(blob => {
+                    let imgUrl = URL.createObjectURL(blob);
+                    document.body.innerHTML += `<img src="${imgUrl}">`;
+                });
         }
 
-        setupCamera();
+        function addFace() {
+            let name = prompt("Enter name:");
+            if (!name) return;
+
+            canvas.toBlob(blob => {
+                let formData = new FormData();
+                formData.append("frame", blob);
+                formData.append("name", name);
+
+                fetch('/add_face', { method: 'POST', body: formData })
+                    .then(response => response.json())
+                    .then(data => document.getElementById("response").innerText = data.message || data.error);
+            }, 'image/jpeg');
+        }
     </script>
 </body>
 </html>

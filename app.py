@@ -1,23 +1,20 @@
-from flask import Flask, render_template, request, Response, redirect, url_for
+from flask import Flask, render_template, request, Response, redirect, url_for, jsonify
 import cv2
 import numpy as np
 import mysql.connector
-import os
 
-# ✅ Initialize Flask App
 app = Flask(__name__)
 
 # ✅ Function to Connect to Railway MySQL Database
 def connect_db():
     return mysql.connector.connect(
-        host="shinkansen.proxy.rlwy.net",  # Railway Host
-        user="root",                       
-        password="LvJzTXIxEJDOgrNISquawcVlhVZwcrtv",   
-        database="railway",                
+        host="shinkansen.proxy.rlwy.net",
+        user="root",
+        password="LvJzTXIxEJDOgrNISquawcVlhVZwcrtv",
+        database="railway",
         port=53399
     )
 
-# ✅ Establish Initial Database Connection
 db = connect_db()
 cursor = db.cursor()
 print("✅ Connected to Railway MySQL Database.")
@@ -34,7 +31,7 @@ def get_face_embedding(face_image):
     blob = cv2.dnn.blobFromImage(face_image, scalefactor=1.0/255, size=(112, 112), mean=(0, 0, 0), swapRB=True, crop=False)
     recognition_net.setInput(blob)
     embedding = recognition_net.forward()
-    embedding = embedding.flatten() / np.linalg.norm(embedding)  # Normalize embedding
+    embedding = embedding.flatten() / np.linalg.norm(embedding)
     return embedding
 
 # ✅ Load Known Faces from MySQL
@@ -46,31 +43,8 @@ def load_known_faces():
         known_faces_db[name] = embedding_array
     return known_faces_db
 
-# ✅ Global Variable to Store Known Faces
 known_faces_db = load_known_faces()
 print(f"✅ Loaded {len(known_faces_db)} known faces: {list(known_faces_db.keys())}")
-
-# ✅ Global Camera Variable
-video_cap = None
-
-# ✅ Function to Get Camera Instance
-def get_camera():
-    global video_cap
-    if video_cap is None or not video_cap.isOpened():
-        video_cap = cv2.VideoCapture(0)
-    return video_cap
-
-# ✅ Function to Release Camera
-def release_camera():
-    global video_cap
-    if video_cap is not None:
-        video_cap.release()
-        video_cap = None
-
-# ✅ Flask Route for Home Page
-@app.route('/')
-def index():
-    return render_template('index.html')
 
 # ✅ Route to Process Webcam Frames
 @app.route('/process_frame', methods=['POST'])
@@ -86,53 +60,35 @@ def process_frame():
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
+    detected_name = "Unknown"
     for (x, y, w, h) in faces:
         face = frame[y:y+h, x:x+w]
         if face.shape[0] > 0 and face.shape[1] > 0:
             face_embedding = get_face_embedding(face)
 
             # Compare with Known Faces
-            recognized_name = "Unknown"
             highest_similarity = 0.0
-
             for name, known_embedding in known_faces_db.items():
                 cosine_similarity = np.dot(face_embedding, known_embedding) / (
                     np.linalg.norm(face_embedding) * np.linalg.norm(known_embedding)
                 )
-
                 if cosine_similarity > highest_similarity and cosine_similarity > 0.55:
                     highest_similarity = cosine_similarity
-                    recognized_name = name
+                    detected_name = name
 
             # Draw Bounding Box & Name
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.putText(frame, recognized_name, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            cv2.putText(frame, detected_name, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
     _, buffer = cv2.imencode('.jpg', frame)
     return Response(buffer.tobytes(), mimetype='image/jpeg')
 
-# ✅ Flask Route for Admin Panel (View & Delete Faces)
-@app.route('/admin')
-def admin():
-    cursor.execute("SELECT id, name FROM known_faces")
-    faces = cursor.fetchall()
-    return render_template('admin.html', faces=faces)
-
-# ✅ Flask Route to Delete a Face
-@app.route('/delete_face', methods=['POST'])
-def delete_face():
-    face_id = request.form['face_id']
-    cursor.execute("DELETE FROM known_faces WHERE id = %s", (face_id,))
-    db.commit()
-    return redirect(url_for('admin'))
-
-# ✅ Flask Route to Manually Add a New Face
+# ✅ Route to Add New Face
 @app.route('/add_face', methods=['POST'])
 def add_face():
     global known_faces_db
     name = request.form['name']
 
-    # Capture and Save New Face
     file = request.files['frame']
     npimg = np.frombuffer(file.read(), np.uint8)
     frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
@@ -153,13 +109,21 @@ def add_face():
 
             # Update Local Known Faces
             known_faces_db = load_known_faces()
-            return f"✅ {name} added successfully! <a href='/'>Go Back</a>"
+            return jsonify({"message": f"✅ {name} added successfully!"})
 
-    return "❌ Face not detected. <a href='/'>Try Again</a>"
+    return jsonify({"error": "❌ Face not detected."})
 
-# ✅ Run Flask App
+# ✅ Route for Admin Panel
+@app.route('/admin')
+def admin():
+    cursor.execute("SELECT id, name FROM known_faces")
+    faces = cursor.fetchall()
+    return render_template('admin.html', faces=faces)
+
+# ✅ Flask Route for Home Page
+@app.route('/')
+def index():
+    return render_template('index.html')
+
 if __name__ == "__main__":
-    try:
-        app.run(debug=True)
-    finally:
-        release_camera()  # Ensure the camera is released when the app stops
+    app.run(debug=True)
