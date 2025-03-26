@@ -7,19 +7,20 @@ import os
 # ✅ Initialize Flask App
 app = Flask(__name__)
 
-# ✅ Function to Connect to MySQL Database
+# ✅ Function to Connect to Railway MySQL Database
 def connect_db():
     return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="@Adhi143",  # Replace with your MySQL password
-        database="face_recognition_db"
+        host="shinkansen.proxy.rlwy.net",  # Railway Host
+        user="root",                       # Railway User
+        password="@Adhi143",   # Replace with your Railway Password
+        database="railway",                # Railway Database Name
+        port=53399                          # Railway Port
     )
 
 # ✅ Establish Initial Database Connection
 db = connect_db()
 cursor = db.cursor()
-print("✅ Connected to MySQL Database.")
+print("✅ Connected to Railway MySQL Database.")
 
 # ✅ Load Face Detection Model
 face_net = cv2.dnn.readNetFromCaffe("deploy.prototxt", "res10_300x300_ssd_iter_140000.caffemodel")
@@ -70,7 +71,7 @@ def generate_frames():
 
         for i in range(detections.shape[2]):
             confidence = detections[0, 0, i, 2]
-            if confidence > 0.6:  # Increased threshold to reduce false positives
+            if confidence > 0.6:  # Adjusted threshold
                 box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
                 (startX, startY, endX, endY) = box.astype("int")
 
@@ -88,7 +89,7 @@ def generate_frames():
                             np.linalg.norm(face_embedding) * np.linalg.norm(known_embedding)
                         )
 
-                        if cosine_similarity > highest_similarity and cosine_similarity > 0.55:  # Adjusted threshold
+                        if cosine_similarity > highest_similarity and cosine_similarity > 0.55:
                             highest_similarity = cosine_similarity
                             recognized_name = name  # Set the recognized name
 
