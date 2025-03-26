@@ -1,4 +1,4 @@
-from flask import Flask, render_template, Response, request, redirect, url_for
+from flask import Flask, render_template, request, Response, redirect, url_for
 import cv2
 import numpy as np
 import mysql.connector
@@ -11,10 +11,10 @@ app = Flask(__name__)
 def connect_db():
     return mysql.connector.connect(
         host="shinkansen.proxy.rlwy.net",  # Railway Host
-        user="root",                       # Railway User
-        password="LvJzTXIxEJDOgrNISquawcVlhVZwcrtv",   # Replace with your Railway Password
-        database="railway",                # Railway Database Name
-        port=53399                          # Railway Port
+        user="root",                       
+        password="LvJzTXIxEJDOgrNISquawcVlhVZwcrtv",   
+        database="railway",                
+        port=53399
     )
 
 # ✅ Establish Initial Database Connection
@@ -23,8 +23,7 @@ cursor = db.cursor()
 print("✅ Connected to Railway MySQL Database.")
 
 # ✅ Load Face Detection Model
-face_net = cv2.dnn.readNetFromCaffe("deploy.prototxt", "res10_300x300_ssd_iter_140000.caffemodel")
-print("✅ Face Detection Model Loaded.")
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
 # ✅ Load Face Recognition Model
 recognition_net = cv2.dnn.readNetFromONNX("face_recognition_sface_2021dec.onnx")
@@ -51,67 +50,49 @@ def load_known_faces():
 known_faces_db = load_known_faces()
 print(f"✅ Loaded {len(known_faces_db)} known faces: {list(known_faces_db.keys())}")
 
-# ✅ Function to Start Webcam & Detect Faces
-def generate_frames():
-    video_cap = cv2.VideoCapture(0)
-    video_cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)  # Reduce frame size for faster processing
-    video_cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
-
-    while True:
-        success, frame = video_cap.read()
-        if not success:
-            break
-
-        h, w = frame.shape[:2]
-        blob = cv2.dnn.blobFromImage(frame, 1.0, (300, 300), (104.0, 177.0, 123.0))
-
-        # Detect Faces
-        face_net.setInput(blob)
-        detections = face_net.forward()
-
-        for i in range(detections.shape[2]):
-            confidence = detections[0, 0, i, 2]
-            if confidence > 0.6:  # Adjusted threshold
-                box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-                (startX, startY, endX, endY) = box.astype("int")
-
-                # Extract Face
-                face = frame[startY:endY, startX:endX]
-                if face.shape[0] > 0 and face.shape[1] > 0:
-                    face_embedding = get_face_embedding(face)
-
-                    # Compare with Known Faces
-                    recognized_name = "Unknown"
-                    highest_similarity = 0.0
-
-                    for name, known_embedding in known_faces_db.items():
-                        cosine_similarity = np.dot(face_embedding, known_embedding) / (
-                            np.linalg.norm(face_embedding) * np.linalg.norm(known_embedding)
-                        )
-
-                        if cosine_similarity > highest_similarity and cosine_similarity > 0.55:
-                            highest_similarity = cosine_similarity
-                            recognized_name = name  # Set the recognized name
-
-                    # Draw Bounding Box & Name
-                    cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
-                    cv2.putText(frame, recognized_name, (startX, startY - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-
-        # Encode Frame for Streaming
-        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])  # Optimize JPEG size
-        frame = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-# ✅ Flask Route for Video Stream
-@app.route('/video_feed')
-def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
 # ✅ Flask Route for Home Page
 @app.route('/')
 def index():
     return render_template('index.html')
+
+# ✅ Route to Process Webcam Frames
+@app.route('/process_frame', methods=['POST'])
+def process_frame():
+    if 'frame' not in request.files:
+        return "No frame received", 400
+
+    file = request.files['frame']
+    npimg = np.frombuffer(file.read(), np.uint8)
+    frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+
+    # 🟢 Perform Face Detection
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+
+    for (x, y, w, h) in faces:
+        face = frame[y:y+h, x:x+w]
+        if face.shape[0] > 0 and face.shape[1] > 0:
+            face_embedding = get_face_embedding(face)
+
+            # Compare with Known Faces
+            recognized_name = "Unknown"
+            highest_similarity = 0.0
+
+            for name, known_embedding in known_faces_db.items():
+                cosine_similarity = np.dot(face_embedding, known_embedding) / (
+                    np.linalg.norm(face_embedding) * np.linalg.norm(known_embedding)
+                )
+
+                if cosine_similarity > highest_similarity and cosine_similarity > 0.55:
+                    highest_similarity = cosine_similarity
+                    recognized_name = name
+
+            # Draw Bounding Box & Name
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.putText(frame, recognized_name, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+    _, buffer = cv2.imencode('.jpg', frame)
+    return Response(buffer.tobytes(), mimetype='image/jpeg')
 
 # ✅ Flask Route for Admin Panel (View & Delete Faces)
 @app.route('/admin')
@@ -133,40 +114,30 @@ def delete_face():
 def add_face():
     global known_faces_db
     name = request.form['name']
-    
+
     # Capture and Save New Face
-    video_cap = cv2.VideoCapture(0)
-    success, frame = video_cap.read()
-    video_cap.release()
+    file = request.files['frame']
+    npimg = np.frombuffer(file.read(), np.uint8)
+    frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
 
-    if success:
-        h, w = frame.shape[:2]
-        blob = cv2.dnn.blobFromImage(frame, 1.0, (300, 300), (104.0, 177.0, 123.0))
+    # Detect Face
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
-        # Detect Faces
-        face_net.setInput(blob)
-        detections = face_net.forward()
+    for (x, y, w, h) in faces:
+        face = frame[y:y+h, x:x+w]
+        if face.shape[0] > 0 and face.shape[1] > 0:
+            face_embedding = get_face_embedding(face)
+            face_embedding_str = ",".join(map(str, face_embedding))
 
-        for i in range(detections.shape[2]):
-            confidence = detections[0, 0, i, 2]
-            if confidence > 0.6:
-                box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-                (startX, startY, endX, endY) = box.astype("int")
+            # Insert into Database
+            cursor.execute("INSERT INTO known_faces (name, face_embedding) VALUES (%s, %s)", (name, face_embedding_str))
+            db.commit()
 
-                # Extract Face
-                face = frame[startY:endY, startX:endX]
-                if face.shape[0] > 0 and face.shape[1] > 0:
-                    face_embedding = get_face_embedding(face)
-                    face_embedding_str = ",".join(map(str, face_embedding))
+            # Update Local Known Faces
+            known_faces_db = load_known_faces()
+            return f"✅ {name} added successfully! <a href='/'>Go Back</a>"
 
-                    # Insert into Database
-                    cursor.execute("INSERT INTO known_faces (name, face_embedding) VALUES (%s, %s)", (name, face_embedding_str))
-                    db.commit()
-
-                    # Update Local Known Faces
-                    known_faces_db = load_known_faces()
-                    return f"✅ {name} added successfully! <a href='/'>Go Back</a>"
-    
     return "❌ Face not detected. <a href='/'>Try Again</a>"
 
 # ✅ Run Flask App

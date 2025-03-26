@@ -1,23 +1,55 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Face Recognition Web App</title>
 </head>
 <body>
     <h1>Face Recognition Live Stream</h1>
-    
-    <!-- Live Video Feed -->
-    <img src="{{ url_for('video_feed') }}" width="640" height="480">
 
-    <!-- Form to Add a New Face -->
-    <h2>Add a New Face</h2>
-    <form action="/add_face" method="post">
-        <input type="text" name="name" placeholder="Enter Name" required>
-        <button type="submit">Add Face</button>
-    </form>
+    <!-- Video Element to Show Live Webcam -->
+    <video id="webcam" autoplay playsinline width="640" height="480"></video>
+    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+    <img id="processedFrame" width="640" height="480">
 
-    <!-- Link to Admin Page to Manage Faces -->
-    <br>
-    <a href="/admin">Manage Faces (Admin Panel)</a>
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const processedFrame = document.getElementById('processedFrame');
+
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                processFrame();
+            } catch (err) {
+                console.error("Error accessing webcam: ", err);
+            }
+        }
+
+        function processFrame() {
+            setInterval(() => {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob(blob => {
+                    const formData = new FormData();
+                    formData.append('frame', blob, 'frame.jpg');
+
+                    fetch('/process_frame', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.blob())
+                    .then(blob => {
+                        processedFrame.src = URL.createObjectURL(blob);
+                    })
+                    .catch(error => console.error("Error sending frame:", error));
+                }, 'image/jpeg');
+            }, 100);
+        }
+
+        setupCamera();
+    </script>
 </body>
 </html>
