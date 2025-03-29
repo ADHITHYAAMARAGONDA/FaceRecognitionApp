@@ -5,7 +5,12 @@
 </head>
 <body>
     <h1>Face Recognition Live Stream</h1>
-    <img id="outputImage" style="display:block; width: 100%; max-width: 600px;">
+    
+    <!-- Live Webcam Feed -->
+    <video id="videoElement" autoplay style="display:block; width:100%; max-width:600px;"></video>
+    
+    <!-- Processed Face Output -->
+    <img id="outputImage" style="display:block; width:100%; max-width:600px;">
     
     <button onclick="addFace()">Add Face</button>
     <p id="response"></p>
@@ -14,13 +19,13 @@
     <a href="/admin">🔗 Manage Database (View, Delete, Update)</a>
 
     <script>
+        const video = document.getElementById("videoElement");
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d");
 
         function sendFrame() {
             navigator.mediaDevices.getUserMedia({ video: true })
                 .then(stream => {
-                    const video = document.createElement("video");
                     video.srcObject = stream;
                     video.play();
 
@@ -43,7 +48,7 @@
                                     const url = URL.createObjectURL(blob);
                                     document.getElementById("outputImage").src = url;
                                 })
-                                .catch(error => console.error("Error:", error));
+                                .catch(error => console.error("Error processing frame:", error));
                             }, "image/jpeg");
                         }, 500); // Send frames every 500ms
                     });
@@ -51,11 +56,15 @@
                 .catch(error => console.error("Error accessing webcam:", error));
         }
 
-        sendFrame(); // Start the frame processing automatically
+        sendFrame(); // Start streaming automatically
 
         function addFace() {
             let name = prompt("Enter name:");
             if (!name) return;
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             canvas.toBlob(blob => {
                 let formData = new FormData();
@@ -70,7 +79,7 @@
                 .then(data => {
                     document.getElementById("response").innerText = data;
                 })
-                .catch(error => console.error("Error:", error));
+                .catch(error => console.error("Error adding face:", error));
             }, "image/jpeg");
         }
     </script>
