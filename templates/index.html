@@ -5,7 +5,6 @@
 </head>
 <body>
     <h1>Face Recognition Live Stream</h1>
-    <video id="videoFeed" autoplay style="display:block; width: 100%; max-width: 600px;"></video>
     <img id="outputImage" style="display:block; width: 100%; max-width: 600px;">
     
     <button onclick="addFace()">Add Face</button>
@@ -15,46 +14,44 @@
     <a href="/admin">🔗 Manage Database (View, Delete, Update)</a>
 
     <script>
-        let video = document.getElementById("videoFeed");
-        let canvas = document.createElement("canvas");
-        let context = canvas.getContext("2d");
-        let isStreaming = false; // ✅ Prevents multiple intervals
-
-        // ✅ Start webcam once
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => {
-                video.srcObject = stream;
-                video.onloadedmetadata = () => {
-                    if (!isStreaming) {
-                        isStreaming = true;
-                        setInterval(sendFrame, 1000); // ✅ Only one interval
-                    }
-                };
-            })
-            .catch(error => console.error("Error accessing webcam:", error));
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
 
         function sendFrame() {
-            if (!isStreaming || video.videoWidth === 0) return; // ✅ Prevents unnecessary calls
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    const video = document.createElement("video");
+                    video.srcObject = stream;
+                    video.play();
 
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    video.addEventListener("loadeddata", () => {
+                        setInterval(() => {
+                            canvas.width = video.videoWidth;
+                            canvas.height = video.videoHeight;
+                            context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            canvas.toBlob(blob => {
-                const formData = new FormData();
-                formData.append("frame", blob);
+                            canvas.toBlob(blob => {
+                                const formData = new FormData();
+                                formData.append("frame", blob);
 
-                fetch("/process_frame", {
-                    method: "POST",
-                    body: formData
+                                fetch("/process_frame", {
+                                    method: "POST",
+                                    body: formData
+                                })
+                                .then(response => response.blob())
+                                .then(blob => {
+                                    const url = URL.createObjectURL(blob);
+                                    document.getElementById("outputImage").src = url;
+                                })
+                                .catch(error => console.error("Error:", error));
+                            }, "image/jpeg");
+                        }, 500); // Send frames every 500ms
+                    });
                 })
-                .then(response => response.json())  // Expect JSON
-                .then(data => {
-                    document.getElementById("outputImage").src = data.image_url;
-                })
-                .catch(error => console.error("Error:", error));
-            }, "image/jpeg");
+                .catch(error => console.error("Error accessing webcam:", error));
         }
+
+        sendFrame(); // Start the frame processing automatically
 
         function addFace() {
             let name = prompt("Enter name:");
@@ -62,8 +59,8 @@
 
             canvas.toBlob(blob => {
                 let formData = new FormData();
-                formData.append("frame", blob);
                 formData.append("name", name);
+                formData.append("face", blob);
 
                 fetch("/add_face", {
                     method: "POST",
