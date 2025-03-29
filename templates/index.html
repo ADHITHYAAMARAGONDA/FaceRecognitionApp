@@ -66,9 +66,9 @@
                     method: "POST",
                     body: formData
                 })
-                .then(response => response.json())
+                .then(response => response.text())
                 .then(data => {
-                    document.getElementById("response").innerText = data.message;
+                    document.getElementById("response").innerText = data;
                 })
                 .catch(error => console.error("Error:", error));
             }, "image/jpeg");
