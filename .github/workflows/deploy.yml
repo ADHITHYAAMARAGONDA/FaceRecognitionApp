@@ -22,14 +22,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
+          
       - name: Install Render CLI
         run: |
           curl -sSL https://render.com/downloads/render-cli.sh | bash
           sudo mv render /usr/local/bin/
-
+          
       - name: Deploy to Render
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}  # Use the secret here
         run: |
-          render deploy --api-key $RENDER_API_KEY  # Example command, modify according to your setup
+          render deploy --api-key $RENDER_API_KEY --service facerecognitionapp-vk7f  # Replace with your actual service name
