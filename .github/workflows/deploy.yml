@@ -1,38 +1,31 @@
-name: Build and Deploy AI Face Recognition App
+name: Deploy to Render
 
-# Trigger the workflow on push to the main branch
 on:
   push:
     branches:
-      - main  # or change to the branch you prefer
+      - main  # Trigger action when there's a push to the 'main' branch
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # Checkout the code from the repository
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    # Log in to Docker Hub
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}  # Add your Docker Hub username in GitHub Secrets
-        password: ${{ secrets.DOCKER_PASSWORD }}  # Add your Docker Hub password in GitHub Secrets
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
 
-    # Build the Docker image
-    - name: Build Docker image
-      run: docker build -t adhithya143/ai-face-recognition:latest .
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    # Push the Docker image to Docker Hub
-    - name: Push Docker image to Docker Hub
-      run: docker push adhithya143/ai-face-recognition:latest
-
-    # (Optional) If you're deploying the app to Render or another platform
-    - name: Deploy to Render (or other cloud provider)
-      run: |
-        curl -fsSL https://cdn.render.com/install.sh | sh  # This installs the Render CLI
-        render login --api-key ${{ secrets.RENDER_API_KEY }}  # Use your Render API key from GitHub secrets
-        render deploy --service-id your-service-id  # Replace `your-service-id` with your actual service ID
+      - name: Deploy to Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}  # Use the secret here
+        run: |
+          # Command to deploy your app to Render
+          render deploy --api-key $RENDER_API_KEY  # Example command, modify according to your setup
