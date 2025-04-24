@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         DOCKER_CREDENTIALS_ID = 'dockerhub'
+        SKIP_DEPLOYMENT = 'true' // Set to 'false' when you want to include deployment
     }
 
     stages {
@@ -23,6 +24,9 @@ pipeline {
         }
 
         stage('Push to DockerHub') {
+            when {
+                expression { return env.SKIP_DEPLOYMENT != 'true' }
+            }
             steps {
                 sh 'docker push adhithya143/ai-face-recognition:latest'
             }
