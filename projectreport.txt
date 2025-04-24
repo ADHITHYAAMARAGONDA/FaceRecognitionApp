@@ -1,4 +1,4 @@
-Project Report: AI-Powered Face Recognition System #This is project
+Project Report: AI-Powered Face Recognition System #This is project #New project report
 Submitted by: Amaragonda Adhithya
 Project Type: Computer Vision, AI & Machine Learning
 Tech Stack: Python, OpenCV, Flask, MySQL, ONNX, Railway, Render
