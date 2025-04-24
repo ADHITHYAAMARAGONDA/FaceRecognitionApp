@@ -2,9 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_CREDENTIALS_ID = 'dockerhub' // Jenkins Credentials ID
-        IMAGE_NAME = 'adhithya143/ai-face-recognition'
-        IMAGE_TAG = 'latest'
+        DOCKER_CREDENTIALS_ID = 'dockerhub'
     }
 
     stages {
@@ -20,17 +18,13 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
-                }
+                sh 'docker build -t adhithya143/ai-face-recognition:latest .'
             }
         }
 
         stage('Push to DockerHub') {
             steps {
-                script {
-                    sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
-                }
+                sh 'docker push adhithya143/ai-face-recognition:latest'
             }
         }
     }
